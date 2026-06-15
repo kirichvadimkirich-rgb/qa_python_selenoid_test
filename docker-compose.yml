@@ -1,57 +1,55 @@
 
-# Файл docker-compose.yml
-# Перечень контейнеров
+# Файл docker-compose.yml описывает, какие контейнеры запускать и как они взаимодействуют.
+# Версия формата указана неявно (используется актуальная версия Compose).
+
 services:
-  # Имя и описание первого контейнера; имя выбирает разработчик. 
-  # Это контейнер селеноида
+  # Сервис selenoid — это основной компонент для запуска браузеров в контейнерах.
   selenoid:
-    # Из какого образа запустить контейнер:
+    # Образ, из которого создаётся контейнер (официальный образ Selenoid).
     image: "aerokube/selenoid:latest"
-    # Как назвать контейнер:
+    # Имя контейнера (удобно для обращения из других контейнеров или команд docker).
     container_name: selenoid
-    # Порты для работы:
+    # Проброс портов: хост:контейнер. Порт 4444 используется для WebDriver API.
     ports:
       - "4444:4444"
-    # Настройка сети для взаимодействия контейнеров
+    # Подключение к пользовательской сети (определена ниже).
     networks:
       - selenoid
-    # Какой volume подключить для этого контейнера
+    # Монтирование томов (директорий) из хост-системы в контейнер.
     volumes:
-      - "./etc/selenoid:/etc/selenoid"    #тут должен лежать browsers.json с настройками браузера
+      # Локальная папка ./etc/selenoid (с файлом browsers.json) монтируется в /etc/selenoid.
+      - "./etc/selenoid:/etc/selenoid"
+      # Прокидываем Docker-сокет хост-системы, чтобы Selenoid мог создавать браузерные контейнеры.
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "/c/etc/selenoid/video:/opt/selenoid/video"
-      - "/c/etc/selenoid/logs:/opt/selenoid/logs"
-    environment:
-      - OVERRIDE_VIDEO_OUTPUT_DIR=./video
+    # Команда, выполняемая при запуске контейнера (переопределяет команду по умолчанию из образа).
     command: ["-conf", "/etc/selenoid/browsers.json", "-container-network", "selenoid"]
+    #   -conf            — путь к конфигурации браузеров
+    #   -container-network — имя сети, в которую Selenoid будет помещать браузерные контейнеры
 
-  # Имя и описание контейнера ui для селеноида
-  selenoid-ui:
-    image: "aerokube/selenoid-ui:latest"
-    container_name: selenoid-ui
-    links:
-      - selenoid
-    ports:
-      - "8081:8080"
-    networks:
-      - selenoid
-    command: ["--selenoid-uri", "http://selenoid:4444"]
-
+  # Сервис test — это ваш тестовый контейнер, который собирается из Dockerfile в текущей директории.
   test:
+    # Сборка образа из текущей папки (ищет Dockerfile).
     build: .
+    # Имя контейнера для тестов.
     container_name: test
-    volumes:
-      - ".:/app"
-    # Какие контейнеры нужно запустить до старта этого контейнера:
+    # Зависимости: test будет запущен только после того, как selenoid будет готов.
     depends_on:
       - selenoid
+    # Подключение к той же сети, что и selenoid (чтобы можно было обращаться по имени selenoid).
     networks:
       - selenoid
+    # Монтирование папки для сохранения результатов Allure.
+    volumes:
+      # Локальная папка ./allure-results будет связана с /app/allure-results внутри контейнера.
+      # Это нужно, чтобы после тестов файлы отчётов оставались на хост-машине (в GitHub Actions).
+      - "./allure-results:/app/allure-results"
+    # Псевдотерминал (TTY) нужен для цветного вывода pytest и возможности прервать тесты (Ctrl+C).
     tty: true
+    # Команда по умолчанию: запустить pytest с генерацией Allure-результатов в папку allure-results.
     command: ["pytest", "--alluredir", "allure-results"]
-    
 
-# Регистрация новой сети:
+# Определение пользовательской сети.
 networks:
   selenoid:
+    # Задаём явное имя сети, чтобы на него можно было ссылаться.
     name: selenoid
