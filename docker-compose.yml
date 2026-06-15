@@ -23,7 +23,6 @@ services:
       - "/c/etc/selenoid/logs:/opt/selenoid/logs"
     environment:
       - OVERRIDE_VIDEO_OUTPUT_DIR=./video
-      - DOCKER_API_VERSION=1.54
     command: ["-conf", "/etc/selenoid/browsers.json", "-container-network", "selenoid"]
 
   # Имя и описание контейнера ui для селеноида
