@@ -1,48 +1,52 @@
-# Имя рабочего процесса (отображается в интерфейсе GitHub Actions).
+# Имя рабочего процесса
 name: Selenoid Tests Workflow
 
-# Условия запуска: при пуше в ветку master.
+# Запуск при пуше в ветку master
 on:
   push:
     branches:
       - master
 
-# Задачи (jobs), которые выполняются в рамках workflow.
 jobs:
-  # Название задачи (может быть любым).
   run-selenoid-tests:
-    # Виртуальная машина (runner) с Ubuntu последней версии.
     runs-on: ubuntu-latest
 
-    # Последовательные шаги, которые выполняются внутри runner.
     steps:
-      # Шаг 1: Клонирование репозитория в текущую директорию runner.
-      # Действие checkout@v4 – стандартное действие GitHub для получения кода.
+      # 1. Клонируем репозиторий
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      # Шаг 2: Скачивание Docker-образа браузера Chrome (последняя версия).
-      # Этот образ будет использоваться Selenoid для запуска браузеров.
+      # 2. Скачиваем образ браузера для Selenoid
       - name: Pull selenoid image
         run: docker pull selenoid/chrome:latest
 
-      # Шаг 3: Запуск тестов внутри Docker Compose.
-      # --build                     – пересобрать образ для сервиса test перед запуском.
-      # --exit-code-from test       – завершить docker compose с кодом выхода контейнера test.
-      #                              (если тесты упадут, CI тоже завершится с ошибкой).
+      # 3. Запускаем тесты в Docker Compose
       - name: Run tests in docker
         run: docker compose up --build --exit-code-from test
 
-      # Шаг 4: Сохранение Allure-результатов (папка allure-results) как артефакта.
-      # Действие upload-artifact@v4 архивирует указанную папку и делает её доступной для скачивания.
-      # if: always() – шаг выполняется всегда, даже если предыдущий шаг (тесты) завершился с ошибкой.
-      # Это позволяет сохранить результаты упавших тестов для анализа.
-      - name: Archive Allure results
+      # 4. Устанавливаем Allure CLI (нужен для генерации отчёта)
+      - name: Install Allure CLI
+        run: |
+          curl -sL https://github.com/allure-framework/allure2/releases/download/2.32.0/allure-2.32.0.tgz | tar -xz
+          sudo mv allure-2.32.0 /opt/allure
+          sudo ln -s /opt/allure/bin/allure /usr/local/bin/allure
+
+      # 5. Генерируем HTML-отчёт из сырых результатов (папка allure-results)
+      - name: Generate Allure report
+        run: allure generate allure-results -o allure-report
+
+      # 6. Загружаем сгенерированный HTML-отчёт как артефакт
+      - name: Upload Allure report
+        uses: actions/upload-artifact@v4
+        if: always()   # загружаем даже если тесты упали
+        with:
+          name: allure-report
+          path: allure-report/
+
+      # (Опционально) Можно также сохранить сырые результаты, если нужно
+      - name: Archive raw Allure results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          # Имя артефакта (пользовательское).
-          name: allure-results
-          # Путь к папке с результатами (относительно корня репозитория).
-          # Папка создаётся внутри runner благодаря монтированию тома в docker-compose.yml.
+          name: allure-results-raw
           path: allure-results/
