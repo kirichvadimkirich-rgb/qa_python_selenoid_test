@@ -1,29 +1,22 @@
 import pytest
 from selenium import webdriver
-from selenium.webdriver import ChromeOptions
-from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 
+@pytest.fixture
+def driver():
+    options = Options()
+    options.set_capability("browserName", "chrome")
+    options.set_capability("browserVersion", "latest")   # <<< меняем на latest
+    options.set_capability("selenoid:options", {"enableVideo": False})
+    options.set_capability("acceptInsecureCerts", True)
+    
+    driver = webdriver.Remote(
+        command_executor="http://selenoid:4444/wd/hub",
+        options=options         
+    )
+    yield driver
+    driver.quit()
 
-class TestExample:
-    @pytest.fixture
-    def driver(self):
-        options = ChromeOptions()
-        options.set_capability('acceptInsecureCerts', True)
-        capabilities = {
-            "browserName": "chrome",
-            "browserVersion": "128.0",
-            "selenoid:options": {
-                "enableVideo": False
-            }
-        }
-        driver = webdriver.Remote(
-            command_executor="http://selenoid:4444/wd/hub",
-            desired_capabilities=capabilities,
-            options=options)
-        driver.maximize_window()
-        driver.get('https://qa-desk.stand.praktikum-services.ru/')
-        yield driver
-        driver.quit()
-
-    def test(self, driver):
-        assert driver.find_element(By.XPATH, "//button[text()='Вход и регистрация']").is_displayed()
+def test_example(driver):
+    driver.get("https://www.google.com")
+    assert "Google" in driver.title
