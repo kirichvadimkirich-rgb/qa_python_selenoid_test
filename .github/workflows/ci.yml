@@ -1,52 +1,58 @@
-# Имя рабочего процесса
+# Имя рабочего процесса, отображается в интерфейсе GitHub Actions
 name: Selenoid Tests Workflow
 
-# Запуск при пуше в ветку master
+# Событие, запускающее workflow: push в ветку master
 on:
   push:
     branches:
       - master
 
+# Задачи (jobs) – здесь одна
 jobs:
+  # Имя задачи (произвольное)
   run-selenoid-tests:
+    # Используемый раннер: Ubuntu последней версии
     runs-on: ubuntu-latest
 
+    # Шаги, выполняемые последовательно
     steps:
-      # 1. Клонируем репозиторий
+      # Шаг 1: Клонирование репозитория в виртуальную машину
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      # 2. Скачиваем образ браузера для Selenoid
+      # Шаг 2: Скачать Docker-образ Chrome для Selenoid
       - name: Pull selenoid image
         run: docker pull selenoid/chrome:latest
 
-      # 3. Запускаем тесты в Docker Compose
+      # Шаг 3: Запустить тесты через Docker Compose
+      #   --build               – пересобрать образ тестового контейнера
+      #   --exit-code-from test – завершить compose с кодом выхода контейнера test
       - name: Run tests in docker
         run: docker compose up --build --exit-code-from test
 
-      # 4. Устанавливаем Allure CLI (нужен для генерации отчёта)
+      # Шаг 4: Установить утилиту Allure CLI для генерации HTML-отчёта
+      #   Скачиваем архив с Allure 2.32.0, распаковываем, перемещаем в /opt/allure,
+      #   создаём символическую ссылку в /usr/local/bin/allure для глобального доступа
       - name: Install Allure CLI
         run: |
           curl -sL https://github.com/allure-framework/allure2/releases/download/2.32.0/allure-2.32.0.tgz | tar -xz
           sudo mv allure-2.32.0 /opt/allure
           sudo ln -s /opt/allure/bin/allure /usr/local/bin/allure
 
-      # 5. Генерируем HTML-отчёт из сырых результатов (папка allure-results)
+      # Шаг 5: Сгенерировать HTML-отчёт из сырых Allure-результатов
+      #   allure-results – папка, смонтированная в docker-compose.yml (результаты тестов)
+      #   allure-report  – папка, куда Allure сгенерирует HTML-отчёт
       - name: Generate Allure report
         run: allure generate allure-results -o allure-report
 
-      # 6. Загружаем сгенерированный HTML-отчёт как артефакт
+      # Шаг 6: Загрузить сгенерированный HTML-отчёт как артефакт сборки
+      #   actions/upload-artifact@v4 – стандартное действие GitHub
+      #   if: always()               – загружаем даже в случае падения тестов (чтобы видеть причины)
+      #   name: allure-report        – имя артефакта (отображается в интерфейсе)
+      #   path: allure-report/       – какая папка архивируется
       - name: Upload Allure report
-        uses: actions/upload-artifact@v4
-        if: always()   # загружаем даже если тесты упали
-        with:
-          name: allure-report
-          path: allure-report/
-
-      # (Опционально) Можно также сохранить сырые результаты, если нужно
-      - name: Archive raw Allure results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: allure-results-raw
-          path: allure-results/
+          name: allure-report
+          path: allure-report/
