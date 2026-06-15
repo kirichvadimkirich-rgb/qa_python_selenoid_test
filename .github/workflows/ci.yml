@@ -11,8 +11,7 @@ jobs:
     steps:
       - name: Check out repository code  
         uses: actions/checkout@v3 
-      # Вставим вторым шагом скачивание нужного контейнера
       - name: Pull selenoid image
-        run: docker pull selenoid/chrome:128.0
+        run: docker pull selenoid/chrome:latest   # заменили на latest
       - name: Run tests in docker
-        run: docker compose up --build --exit-code-from test_docker 
+        run: docker compose up --build --exit-code-from test
